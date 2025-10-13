@@ -19,18 +19,14 @@
           <div class="step" :class="{ active: currentStep >= 3, completed: currentStep > 3 }">
             3. Composite Tools
           </div>
-          <div class="step" :class="{ active: currentStep >= 4, completed: currentStep > 4 }">
-            4. Generate Tools
-          </div>
-          <div class="step" :class="{ active: currentStep >= 5 }">
-            5. Download Server
+          <div class="step" :class="{ active: currentStep >= 4 }">
+            4. Generate Server
           </div>
         </div>
 
         <EndpointList v-if="currentStep === 2" @next="currentStep = 3" />
         <CompositeToolCreator v-if="currentStep === 3" @next="currentStep = 4" @back="currentStep = 2" />
-        <ToolPreview v-if="currentStep === 4" @next="currentStep = 5" />
-        <ServerGenerator v-if="currentStep === 5" />
+        <ServerGenerator v-if="currentStep === 4" />
 
         <button @click="reset" class="reset-btn">Start Over</button>
       </div>
@@ -48,7 +44,6 @@ import { useConverterStore } from './stores/converter'
 import SpecUploader from './components/SpecUploader.vue'
 import EndpointList from './components/EndpointList.vue'
 import CompositeToolCreator from './components/CompositeToolCreator.vue'
-import ToolPreview from './components/ToolPreview.vue'
 import ServerGenerator from './components/ServerGenerator.vue'
 
 const store = useConverterStore()

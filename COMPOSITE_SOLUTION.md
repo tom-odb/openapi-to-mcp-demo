@@ -1,4 +1,4 @@
-# Composite Tool Solution: LLM Agent Orchestration
+# Composite Tool Solution: MCP Tool Orchestration with LLM
 
 ## Problem Identified
 
@@ -21,50 +21,94 @@ The simple sequential approach can't do this.
 
 ## Solution Implemented
 
-### LLM Agent Orchestration
+### MCP Tool Orchestration with LLM
 
-Use **Claude as an on-the-fly orchestration agent** that:
+The composite tool handler uses **Claude to orchestrate MCP tool calls**:
 
-✅ Has access to all standard API tools
-✅ Follows the orchestration logic from the composite tool
-✅ Makes intelligent decisions about order and data flow
-✅ Handles dynamic iteration and data extraction
-✅ Aggregates results intelligently
+✅ **MCP tools are the primitives** - Each API endpoint is an MCP tool
+✅ **Claude orchestrates MCP tools** - LLM decides which MCP tools to call
+✅ **Demonstrates MCP patterns** - Shows MCP server using MCP tools internally
+✅ **Handles complexity** - Data flow, iteration, aggregation all work
+
+### Architecture: MCP Tools as Building Blocks
+
+```
+┌─────────────────────────────────────────┐
+│  MCP Server (this server)               │
+│                                         │
+│  Composite Tool Handler:                │
+│  ┌─────────────────────────────────┐   │
+│  │  Claude Orchestration Agent     │   │
+│  │  • Given MCP tool definitions   │   │
+│  │  • Calls MCP tools via          │   │
+│  │    standard tool handler        │   │
+│  │  • Each tool = API endpoint     │   │
+│  └─────────────────────────────────┘   │
+│           ↓                             │
+│  Standard MCP Tools:                    │
+│  • getCustomer (MCP tool)               │
+│  • listCustomerOrders (MCP tool)        │
+│  • getProduct (MCP tool)                │
+│  • ... (all are MCP tools)              │
+│           ↓                             │
+│  → Make HTTP calls to actual API        │
+└─────────────────────────────────────────┘
+```
+
+**This IS MCP!** The composite tool orchestrates **other MCP tools** (the standard endpoint tools).
 
 ### How It Works
 
 ```
 User: get_customer_with_latest_products(customerId="123")
     ↓
-Server creates agent with:
-  - System prompt: "Execute this workflow..."
-  - Orchestration logic: "1) Get customer 2) Get orders 3) Get products..."
-  - Available tools: [getCustomer, listCustomerOrders, getProduct, ...]
-  - User input: {customerId: "123"}
+Composite tool handler creates orchestration agent with:
+  - MCP tool definitions (standard tools)
+  - Orchestration logic
+  - User input
     ↓
-Agent (Claude) iteratively:
-  Iteration 1: "I need customer details first"
-    → Calls getCustomer(customerId="123")
-    ← Gets: {id: "123", name: "John", ...}
+Claude orchestrates MCP tool calls:
+  Iteration 1: "I need customer details"
+    → Calls MCP tool: getCustomer(customerId="123")
+    ← MCP tool returns: {id: "123", name: "John", ...}
   
   Iteration 2: "Now get their orders"
-    → Calls listCustomerOrders(customerId="123", limit=10)
-    ← Gets: {orders: [{orderId: "o1", productIds: ["p1","p2"]}, ...]}
+    → Calls MCP tool: listCustomerOrders(customerId="123")
+    ← MCP tool returns: {orders: [...]}
   
-  Iteration 3: "Extract unique product IDs: p1, p2, p3..."
+  Iteration 3-12: "Get each product"
+    → Calls MCP tool: getProduct(productId="p1")
+    → Calls MCP tool: getProduct(productId="p2")
+    ... (multiple MCP tool calls)
   
-  Iterations 4-13: "Get details for each product"
-    → Calls getProduct(productId="p1")
-    → Calls getProduct(productId="p2")
-    ... (for each product)
-  
-  Final iteration: "Combine customer + products"
-    → Returns aggregated result
+  Final: "Combine results"
+    → Returns aggregated response
     ↓
-User gets complete response
+User gets complete result
 ```
 
-## Implementation Changes
+**Key MCP Concept:** The composite tool is essentially **an MCP tool that orchestrates other MCP tools**!
+
+## Why This IS an MCP Pattern
+
+### MCP Tools Calling MCP Tools
+
+The implementation demonstrates a key MCP pattern:
+
+1. **Standard tools are MCP tools** - Each API endpoint is exposed as an MCP tool
+2. **Composite tool is an MCP tool** - It's exposed via the same MCP interface
+3. **Composite tool uses MCP tools** - It internally calls the standard MCP tools
+4. **LLM orchestrates MCP tools** - Claude decides which MCP tools to call
+
+This is **MCP tool composition** - higher-level MCP tools built from lower-level MCP tools!
+
+### MCP Benefits Demonstrated
+
+✅ **Tool Reusability** - Standard MCP tools work standalone OR in compositions
+✅ **Declarative Composition** - Composite tools defined in JSON, not code
+✅ **Flexible Orchestration** - LLM provides intelligent tool sequencing
+✅ **Type Safety** - All tools use JSON Schema for inputs
+✅ **Protocol Native** - Everything goes through MCP tool call mechanism
 
 ### 1. Updated generic_server.py
 

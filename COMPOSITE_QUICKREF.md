@@ -1,4 +1,13 @@
-# Composite Tool Quick Reference
+# Composite Tool Quick Reference: MCP Tool Composition
+
+## MCP Pattern
+
+Composite tools demonstrate **MCP tool composition**:
+- Standard tools = MCP tools (one per API endpoint)
+- Composite tool = MCP tool (orchestrates other MCP tools)
+- Claude = Orchestration engine (decides which MCP tools to call)
+
+This is pure MCP - no external tool-use APIs involved!
 
 ## Setup
 

@@ -1,4 +1,4 @@
-# Composite Tool Orchestration with LLM Agents
+# Composite Tool Orchestration with MCP
 
 ## The Problem
 
@@ -11,19 +11,44 @@ Composite tools need to:
 
 A simple sequential execution won't work because it can't handle data flow between calls.
 
-## The Solution: On-the-Fly LLM Agent
+## The Solution: MCP Tool Orchestration
 
-Instead of trying to generate orchestration code, we use **Claude as an orchestration agent** that:
+Instead of trying to generate orchestration code, we use **MCP tools as the building blocks** and **Claude to orchestrate them**:
 
-1. **Receives the composite tool request** with user inputs
-2. **Gets access to all standard API tools** as callable functions
-3. **Follows the orchestration logic** from the composite tool definition
-4. **Makes intelligent decisions** about:
-   - Which tools to call and in what order
-   - What data to extract from responses
-   - How to handle loops and iterations
-   - How to combine results
-5. **Returns the final aggregated result**
+1. **Each API endpoint is an MCP tool** - Standard tools expose individual endpoints
+2. **Composite tools are also MCP tools** - Higher-level tools exposed via MCP
+3. **Claude orchestrates MCP tool calls** - LLM decides which MCP tools to call
+4. **This demonstrates MCP composition** - MCP tools built from other MCP tools
+
+### MCP Pattern: Tool Composition
+
+```
+┌─────────────────────────────────────┐
+│  User calls composite MCP tool      │
+│  get_customer_with_latest_products  │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│  MCP Server handles composite tool  │
+│  • Receives MCP tool call           │
+│  • Starts orchestration             │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│  Claude orchestrates MCP tools:     │
+│  • Calls getCustomer (MCP tool)     │
+│  • Calls listCustomerOrders (MCP)   │
+│  • Calls getProduct (MCP) × N       │
+│  • Each call goes through standard  │
+│    MCP tool handler                 │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│  Returns aggregated result via MCP  │
+└─────────────────────────────────────┘
+```
+
+**This IS MCP!** We're not using a separate tool-use API - we're using **MCP tools to orchestrate other MCP tools**.
 
 ## How It Works
 
