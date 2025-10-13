@@ -294,9 +294,9 @@
   ],
   "composite_tools": [
     {
-      "name": "get_customer_with_latest_products",
-      "description": "Retrieve a customer's details along with the latest 10 products they ordered, sorted by order date",
-      "use_case_description": "Retrieve al customer with the latest 10 products they ordered.",
+      "name": "get_customer_with_recent_products",
+      "description": "Retrieves customer details along with the last 10 products they ordered, providing a comprehensive view of the customer's recent purchase history",
+      "use_case_description": "Retrieve a customer with the last 10 products they ordered.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -314,31 +314,76 @@
           "path": "/products/{productId}",
           "method": "get",
           "operation_id": "getProduct",
-          "purpose": "Retrieves complete product details for each product found in the customer's recent orders"
-        },
-        {
-          "path": "/orders",
-          "method": "get",
-          "operation_id": "listOrders",
-          "purpose": ""
+          "purpose": "Gets detailed information for each product found in the customer's recent orders"
         },
         {
           "path": "/orders/{orderId}",
           "method": "get",
           "operation_id": "getOrder",
-          "purpose": "Fetches detailed order information including product IDs for each recent order"
-        },
-        {
-          "path": "/customers/{customerId}/orders",
-          "method": "get",
-          "operation_id": "listCustomerOrders",
-          "purpose": "Gets the list of orders for the specific customer, ordered by most recent first"
+          "purpose": ""
         },
         {
           "path": "/customers/{customerId}",
           "method": "get",
           "operation_id": "getCustomer",
-          "purpose": "Retrieves the customer's basic information and profile details"
+          "purpose": "Retrieves the customer's basic information and details"
+        },
+        {
+          "path": "/customers/{customerId}/orders",
+          "method": "get",
+          "operation_id": "listCustomerOrders",
+          "purpose": "Fetches the customer's order history to identify recent orders containing products"
+        }
+      ],
+      "orchestration_logic": "1) Call GET /customers/{customerId} with the provided customerId to retrieve customer details, 2) Call GET /customers/{customerId}/orders with the same customerId and limit=10 query parameter to get the customer's 10 most recent orders, 3) Extract all unique productIds from the orders returned in step 2 by parsing through each order's product list, 4) For each unique productId found, call GET /products/{productId} to retrieve detailed product information, 5) Combine the customer data from step 1 with the enriched product details from step 4, maintaining the chronological order of when products were purchased, 6) Return a composite object containing the customer information and an array of the last 10 products with their full details and order context",
+      "is_composite": true
+    },
+    {
+      "name": "get_product_with_recent_customers",
+      "description": "Get detailed product information along with the last 5 customers who ordered that product",
+      "use_case_description": "Get a product detail with the last 5 customers who ordered it.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "The unique identifier of the product to retrieve details and recent customers for"
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "endpoint_mappings": [
+        {
+          "path": "/products/{productId}",
+          "method": "get",
+          "operation_id": "getProduct",
+          "purpose": "Retrieve the complete product details including name, description, price, and other product attributes"
+        },
+        {
+          "path": "/orders",
+          "method": "get",
+          "operation_id": "listOrders",
+          "purpose": "Get all orders to identify which ones contain the specified product, then sort by date to find the most recent orders"
+        },
+        {
+          "path": "/orders/{orderId}",
+          "method": "get",
+          "operation_id": "getOrder",
+          "purpose": "Get detailed order information for each recent order to extract customer IDs and order specifics"
+        },
+        {
+          "path": "/customers/{customerId}",
+          "method": "get",
+          "operation_id": "getCustomer",
+          "purpose": "Retrieve customer details for each of the customers who placed recent orders containing the product"
+        },
+        {
+          "path": "/customers/{customerId}/orders",
+          "method": "get",
+          "operation_id": "listCustomerOrders",
+          "purpose": ""
         },
         {
           "path": "/customers",
@@ -347,7 +392,7 @@
           "purpose": ""
         }
       ],
-      "orchestration_logic": "1) Call GET /customers/{customerId} with the provided customerId to retrieve customer details and verify the customer exists. 2) Call GET /customers/{customerId}/orders with limit=10 to get the customer's 10 most recent orders (assuming API returns orders sorted by date desc). 3) For each order returned in step 2, call GET /orders/{orderId} using the orderId to get detailed order information including the list of product IDs in each order. 4) Extract all unique product IDs from the order details and call GET /products/{productId} for each unique product to get complete product information. 5) Combine the results by creating a response object containing the customer details from step 1 and an array of the latest 10 products with their full details, maintaining the chronological order based on when they were ordered. 6) Return the combined customer and products data as a unified response.",
+      "orchestration_logic": "1) Call GET /products/{productId} with the input productId to retrieve complete product details and store the product information. 2) Call GET /orders with query parameters to retrieve all orders (may need pagination with limit and page parameters to get comprehensive results). 3) Filter the orders response to identify orders that contain the specified productId in their line items, then sort these orders by order date in descending order to get the most recent orders first. 4) Select the top 5 most recent orders containing the product and extract their order IDs. 5) For each of these 5 orders, call GET /orders/{orderId} to get detailed order information and extract the customerId from each order. 6) For each unique customerId from step 5 (handling potential duplicates), call GET /customers/{customerId} to retrieve complete customer details including name, contact information, and other customer attributes. 7) Combine and return the results as an object containing the product details from step 1 and an array of the customer details from step 6, ordered by recency of their orders containing the product.",
       "is_composite": true
     }
   ]

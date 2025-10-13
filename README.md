@@ -2,18 +2,6 @@
 
 Convert OpenAPI specifications into working MCP (Model Context Protocol) servers with AI-powered enrichment.
 
-## 🆕 NEW: Declarative Architecture
-
-This tool now uses a **declarative JSON-based architecture** instead of code generation:
-- ✅ Tools defined in `tools.json` (not generated code)
-- ✅ Generic server reads JSON and creates tools dynamically
-- ✅ Easy to modify tools by editing JSON
-- ✅ Version control friendly
-- ✅ Supports both standard and composite tools
-
-**See [DECLARATIVE_QUICKSTART.md](DECLARATIVE_QUICKSTART.md) for the quick start guide.**
-**See [DECLARATIVE_ARCHITECTURE.md](DECLARATIVE_ARCHITECTURE.md) for architecture details.**
-
 ## Overview
 
 This tool demonstrates how quickly you can transform an existing API into a functional MCP server that works with Claude and other AI assistants. It combines:
@@ -28,19 +16,28 @@ This tool demonstrates how quickly you can transform an existing API into a func
 
 ```
 openapi-to-mcp/
-├── backend/              # FastAPI backend
+├── api/                    # FastAPI backend (converter service)
 │   ├── app/
-│   │   ├── api/         # API routes
-│   │   ├── services/    # Core services (parser, enricher, generators)
-│   │   └── models/      # Pydantic schemas
-│   └── requirements.txt
-├── frontend/            # Vue 3 frontend
+│   │   ├── api/            # API routes
+│   │   ├── services/       # Core services (parser, enricher, generators)
+│   │   ├── models/         # Pydantic schemas
+│   │   └── templates/      # Template files for MCP server generation
+│   ├── pyproject.toml      # Python dependencies (uv-compatible)
+│   └── requirements.txt    # Alternative pip requirements
+├── ui/                     # Vue 3 frontend
 │   ├── src/
-│   │   ├── components/  # Vue components
-│   │   └── stores/      # Pinia state management
-│   └── package.json
-├── examples/            # Example OpenAPI specs
-└── generated_servers/   # Output directory for MCP servers
+│   │   ├── components/     # Vue components
+│   │   ├── stores/         # Pinia state management
+│   │   └── views/          # Vue views
+│   ├── package.json        # Node.js dependencies
+│   └── vite.config.js      # Vite configuration
+├── crm/                    # Example CRM API (for testing)
+│   ├── main.py             # FastAPI CRM implementation
+│   ├── docs/
+│   │   └── crm_openapi.yaml  # OpenAPI spec for CRM
+│   ├── pyproject.toml      # CRM API dependencies
+│   └── seed_data.py        # Sample data generator
+└── generated-servers/      # Output directory for generated MCP servers
 ```
 
 ## Prerequisites
@@ -51,10 +48,31 @@ openapi-to-mcp/
 
 ## Quick Start
 
-### 1. Backend Setup
+### 1. Backend Setup (Converter API)
+
+#### Using uv (recommended)
 
 ```bash
-cd backend
+cd api
+
+# Install uv if you haven't already
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Sync dependencies (creates .venv automatically)
+uv sync
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
+
+# Start backend server
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+#### Using pip (alternative)
+
+```bash
+cd api
 
 # Create virtual environment
 python -m venv venv
@@ -76,7 +94,7 @@ The backend will be available at `http://localhost:8000`
 ### 2. Frontend Setup
 
 ```bash
-cd frontend
+cd ui
 
 # Install dependencies
 npm install
@@ -86,6 +104,24 @@ npm run dev
 ```
 
 The frontend will be available at `http://localhost:5173`
+
+### 3. Example CRM API (Optional)
+
+To test the converter with a real API:
+
+```bash
+cd crm
+
+# Using uv (recommended)
+uv sync
+uv run uvicorn main:app --reload --port 8001
+
+# OR using pip
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
+
+The CRM API will be available at `http://localhost:8001` with OpenAPI docs at `http://localhost:8001/docs`
 
 ## Usage Workflow
 
@@ -143,7 +179,12 @@ The frontend will be available at `http://localhost:5173`
 
 ## Example
 
-An example e-commerce API specification is included in `examples/ecommerce_openapi.yaml`. Use this for testing and demonstration purposes.
+An example CRM API is included in the `crm/` directory with its OpenAPI specification at `crm/docs/crm_openapi.yaml`. This provides:
+- A working FastAPI implementation to test against
+- A complete OpenAPI spec for conversion testing
+- Sample endpoints for products, customers, and orders
+
+You can use the CRM API's OpenAPI spec to test the entire conversion workflow.
 
 ## Key Features
 
@@ -157,10 +198,16 @@ An example e-commerce API specification is included in `examples/ecommerce_opena
 - Adds business context to help AI assistants understand when to use each tool
 - Combines user domain knowledge with LLM reasoning
 
+### Composite Tools
+- Combine multiple API endpoints into single, powerful tools
+- Create workflows like "search and purchase" or "create customer and order"
+- AI-assisted suggestions for useful composite tool combinations
+
 ### Complete Server Generation
-- Creates working Python MCP servers using the FastMCP library
+- Creates working Python MCP servers with declarative tool definitions
 - Includes proper error handling and HTTP method support
-- Generates README, configuration files, and installation instructions
+- Generates README, pyproject.toml, and installation instructions
+- Output saved to `generated-servers/` directory
 
 ## Architecture
 
@@ -171,12 +218,13 @@ An example e-commerce API specification is included in `examples/ecommerce_opena
 - **ToolGenerator**: Converts endpoints to MCP tool definitions
 - **ServerGenerator**: Creates complete MCP server packages
 
-### Frontend Components
+### Frontend Components (ui/)
 
 - **SpecUploader**: File upload interface with drag-and-drop
 - **EndpointList**: Interactive endpoint review and enrichment
 - **ToolPreview**: Displays generated tool definitions
 - **ServerGenerator**: Handles server creation and download
+- **CompositeToolCreator**: Create composite tools from multiple endpoints
 
 ## API Endpoints
 
@@ -193,11 +241,11 @@ An example e-commerce API specification is included in `examples/ecommerce_opena
 
 ```bash
 # Backend tests
-cd backend
+cd api
 pytest
 
 # Frontend tests
-cd frontend
+cd ui
 npm run test
 ```
 

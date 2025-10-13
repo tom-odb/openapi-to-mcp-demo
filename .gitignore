@@ -39,3 +39,5 @@ generated_servers/
 
 # Logs
 *.log
+
+generated-servers

@@ -1,6 +1,6 @@
-# products-mcp MCP Server
+# {server_name} MCP Server
 
-MCP server for **products** API, dynamically generated from OpenAPI specification.
+MCP server for **{api_name}** API, dynamically generated from OpenAPI specification.
 
 ## Overview
 
@@ -10,25 +10,9 @@ This server reads tool definitions from `tools.json` and exposes them as MCP (Mo
 
 ### Standard Tools
 
-- **`listProducts`**: Retrieve a paginated list of products
-- **`createProduct`**: Create a new product
-- **`getProduct`**: Get product details
-- **`updateProduct`**: Update a product
-- **`deleteProduct`**: Delete a product
-- **`listOrders`**: List all orders
-- **`createOrder`**: Create a new order
-- **`getOrder`**: Get order details
-- **`listCustomers`**: List all customers
-- **`createCustomer`**: Create a new customer
-- **`getCustomer`**: Get customer details
-- **`listCustomerOrders`**: List orders for a customer
+{tools_list}
 
-
-### Composite Tools (Multi-Endpoint Orchestrations)
-
-- **`get_customer_with_recent_products`**: Retrieves customer details along with the last 10 products they ordered, providing a comprehensive v... *(combines 4 endpoints)*
-- **`get_product_with_recent_customers`**: Get detailed product information along with the last 5 customers who ordered that product *(combines 6 endpoints)*
-
+{composite_tools_section}
 
 ## Installation
 
@@ -77,7 +61,7 @@ cp .env.example .env
 
 ### Environment Variables
 
-- `API_KEY`: Your API key for products (if required)
+- `API_KEY`: Your API key for {api_name} (if required)
 - `TOOLS_CONFIG_PATH`: Path to tools.json (defaults to `./tools.json`)
 
 ### Tools Configuration
@@ -114,15 +98,58 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 ```json
 {{
   "mcpServers": {{
-    "products-mcp": {{
+    "{server_name}": {{
       "command": "python",
-      "args": ["generated_servers/products-mcp/server.py"],
+      "args": ["{server_path}/server.py"],
       "env": {{
         "API_KEY": "your-api-key-here",
-        "TOOLS_CONFIG_PATH": "generated_servers/products-mcp/tools.json"
+        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
       }}
     }}
   }}
+}}
+```
+
+## Usage with VS Code (GitHub Copilot)
+
+Add to your VS Code MCP config (`.vscode/mcp.json` in your workspace):
+
+```json
+{{
+  "servers": {{
+    "{server_name}": {{
+      "command": "uv",
+      "args": [
+        "run",
+        "{server_path}/server.py"
+      ],
+      "cwd": "{server_path}",
+      "env": {{
+        "API_KEY": "your-api-key-here",
+        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
+      }}
+    }}
+  }},
+  "inputs": []
+}}
+```
+
+**Note**: If using uv, make sure it's installed and in your PATH. You can also use `python` instead of `uv` for the command, adjusting the args accordingly:
+
+```json
+{{
+  "servers": {{
+    "{server_name}": {{
+      "command": "python",
+      "args": ["{server_path}/server.py"],
+      "cwd": "{server_path}",
+      "env": {{
+        "API_KEY": "your-api-key-here",
+        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
+      }}
+    }}
+  }},
+  "inputs": []
 }}
 ```
 
