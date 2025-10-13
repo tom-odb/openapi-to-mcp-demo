@@ -1,0 +1,592 @@
+openapi: 3.0.0
+info:
+  title: E-Commerce API
+  version: 1.1.0
+  description: A simple e-commerce API for managing products, orders, and customers
+
+servers:
+  - url: https://api.example-shop.com/v1
+    description: Production server
+
+tags:
+  - name: Products
+  - name: Orders
+  - name: Customers
+
+paths:
+  /products:
+    get:
+      tags: [Products]
+      operationId: listProducts
+      summary: List all products
+      description: Retrieve a paginated list of products
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+    post:
+      tags: [Products]
+      operationId: createProduct
+      summary: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+  /products/{productId}:
+    get:
+      tags: [Products]
+      operationId: getProduct
+      summary: Get product details
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+    put:
+      tags: [Products]
+      operationId: updateProduct
+      summary: Update a product
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '200':
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+    delete:
+      tags: [Products]
+      operationId: deleteProduct
+      summary: Delete a product
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: Product deleted successfully
+        '404':
+          description: Product not found
+
+  /orders:
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: List all orders
+      parameters:
+        - name: status
+          in: query
+          description: Filter by order status
+          required: false
+          schema:
+            type: string
+            enum: [pending, processing, shipped, delivered, cancelled]
+        - name: customerId
+          in: query
+          description: Filter by customer ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Create a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          links:
+            GetCreatedOrder:
+              operationId: getOrder
+              parameters:
+                orderId: '$response.body#/id'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Get order details
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          links:
+            GetOrderCustomer:
+              operationId: getCustomer
+              parameters:
+                customerId: '$response.body#/customerId'
+            ListOrdersForCustomer:
+              operationId: listCustomerOrders
+              parameters:
+                customerId: '$response.body#/customerId'
+        '404':
+          description: Order not found
+
+  /customers:
+    get:
+      tags: [Customers]
+      operationId: listCustomers
+      summary: List all customers
+      parameters:
+        - name: search
+          in: query
+          description: Search by name or email
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerListResponse'
+    post:
+      tags: [Customers]
+      operationId: createCustomer
+      summary: Create a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+  /customers/{customerId}:
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: Get customer details
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found
+
+  /customers/{customerId}/orders:
+    get:
+      tags: [Customers, Orders]
+      operationId: listCustomerOrders
+      summary: List orders for a customer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '404':
+          description: Customer not found
+
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      description: Number of items per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 20
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # === Core domain entities ===
+    Product:
+      type: object
+      required: [id, name, price, stock, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Product identifier
+        name:
+          type: string
+          description: Product name
+        description:
+          type: string
+          description: Product description
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Unit price (in shop currency)
+        currency:
+          type: string
+          description: ISO 4217 currency code for the price
+          default: USD
+          example: EUR
+        category:
+          type: string
+          description: Product category
+        stock:
+          type: integer
+          minimum: 0
+          description: Available stock
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Customer:
+      type: object
+      required: [id, name, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          description: Customer name
+        email:
+          type: string
+          format: email
+          description: Customer email
+        phone:
+          type: string
+          description: Customer phone number
+        defaultShippingAddress:
+          $ref: '#/components/schemas/Address'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Order:
+      type: object
+      description: >
+        An order placed by a customer. Relates to Customer via customerId,
+        and to Product via items[].productId.
+      required:
+        [id, customerId, status, items, currency, subtotal, shipping, tax, total, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        customerId:
+          type: string
+          format: uuid
+          description: References Customer.id
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered, cancelled]
+          default: pending
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        shippingAddress:
+          $ref: '#/components/schemas/Address'
+        currency:
+          type: string
+          description: ISO 4217 currency code for monetary amounts in the order
+          example: EUR
+        subtotal:
+          type: number
+          format: float
+          minimum: 0
+          description: Sum of (unitPrice * quantity) over all items
+        shipping:
+          type: number
+          format: float
+          minimum: 0
+        tax:
+          type: number
+          format: float
+          minimum: 0
+        discount:
+          type: number
+          format: float
+          minimum: 0
+          default: 0
+        total:
+          type: number
+          format: float
+          minimum: 0
+          description: subtotal + shipping + tax - discount
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    OrderItem:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: References Product.id
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          format: float
+          minimum: 0
+          description: Unit price captured at order time (denormalized from Product)
+
+    Address:
+      type: object
+      required: [line1, city, postalCode, country]
+      properties:
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+          description: State/Province/Region
+        postalCode:
+          type: string
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code
+          example: BE
+
+    # === Create/Update payloads ===
+    ProductCreate:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: float
+          minimum: 0
+        currency:
+          type: string
+          default: USD
+        category:
+          type: string
+        stock:
+          type: integer
+          minimum: 0
+
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: float
+          minimum: 0
+        currency:
+          type: string
+        category:
+          type: string
+        stock:
+          type: integer
+          minimum: 0
+
+    CustomerCreate:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        defaultShippingAddress:
+          $ref: '#/components/schemas/Address'
+
+    OrderCreate:
+      type: object
+      required: [customerId, items]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: Customer identifier (Customer.id)
+        items:
+          type: array
+          description: Order items; each references a Product
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId:
+                type: string
+                format: uuid
+                description: Product identifier (Product.id)
+              quantity:
+                type: integer
+                minimum: 1
+        shippingAddress:
+          $ref: '#/components/schemas/Address'
+        currency:
+          type: string
+          description: If omitted, defaults to shop currency
+
+    # === List response wrappers ===
+    ProductListResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    OrderListResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CustomerListResponse:
+      type: object
+      properties:
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
