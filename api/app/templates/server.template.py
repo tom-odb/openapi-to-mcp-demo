@@ -6,23 +6,37 @@ Composite tools use MCP client to orchestrate calls to standard tools.
 import asyncio
 import httpx
 import json
+import logging
 import os
+import sys
 from pathlib import Path
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, LoggingLevel
 from typing import Dict, Any, List, Optional
 from anthropic import Anthropic
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from dotenv import load_dotenv
+from contextvars import ContextVar
+
+# Configure logging to use stderr (stdout is reserved for MCP JSON-RPC)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(levelname)s] %(message)s',
+    stream=sys.stderr
+)
+logger = logging.getLogger(__name__)
+
+# Context variable to store the current request context
+_request_context: ContextVar[Optional[Any]] = ContextVar('request_context', default=None)
 
 load_dotenv()
 
 class GenericMCPServer:
     def __init__(self, tools_config_path: str):
         """Initialize server with tools configuration"""
-        print(f"[MCP] Loading tools config from: {tools_config_path}")
+        logger.info(f"Loading tools config from: {tools_config_path}")
         self.config = self._load_config(tools_config_path)
         self.api_name = self.config.get("api_name", "api")
         self.base_url = self.config.get("base_url", "")
@@ -30,22 +44,20 @@ class GenericMCPServer:
         self.composite_tools = self.config.get("composite_tools", [])
         self.api_key = os.getenv("API_KEY", "")
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        self.progress_messages = []  # Store progress messages to include in result
         
-        print(f"[MCP] Starting server for API: {self.api_name}")
-        print(f"[MCP] Base URL: {self.base_url}")
-        print(f"[MCP] Standard tools: {len(self.tools)} | Composite tools: {len(self.composite_tools)}")
-        print(f"[MCP] To connect, set TOOLS_CONFIG_PATH={tools_config_path} and run: python server.py")
-        if self.api_key:
-            print("[MCP] API_KEY is set (env)")
-        else:
-            print("[MCP] API_KEY is not set (env)")
+        logger.info(f"Starting server for API: {self.api_name}")
+        logger.info(f"Base URL: {self.base_url}")
+        logger.info(f"Standard tools: {len(self.tools)} | Composite tools: {len(self.composite_tools)}")
+            
         if self.anthropic_api_key and len(self.composite_tools) > 0:
-            print("[MCP] ANTHROPIC_API_KEY is set - composite tools will use LLM orchestration")
+            logger.info("ANTHROPIC_API_KEY is configured - composite tools enabled")
         elif len(self.composite_tools) > 0:
-            print("[MCP] WARNING: Composite tools found but ANTHROPIC_API_KEY not set - they may not work correctly")
-        print("[MCP] Server is initializing...\n")
+            logger.warning("Composite tools found but ANTHROPIC_API_KEY not set - they may not work correctly")
+            
         self.app = Server(f"{self.api_name}-mcp-server")
         self._register_handlers()
+        logger.info("Server initialization complete")
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load tools configuration from JSON file"""
@@ -79,8 +91,13 @@ class GenericMCPServer:
             return mcp_tools
         
         @self.app.call_tool()
-        async def call_tool(name: str, arguments: dict) -> List[TextContent]:
+        async def call_tool(name: str, arguments: dict, request_context: Any = None) -> List[TextContent]:
             """Execute a tool by making API request(s)"""
+            
+            # Store request context for logging and attach progress messages list
+            if request_context:
+                request_context.progress_messages = []
+            _request_context.set(request_context)
             
             # Check if it's a standard tool
             for tool in self.tools:
@@ -93,6 +110,42 @@ class GenericMCPServer:
                     return await self._handle_composite_tool(tool, arguments)
             
             raise ValueError(f"Unknown tool: {name}")
+    
+    async def _send_progress(self, message: str, level: str = "info"):
+        """Store progress message and send log notification to MCP client"""
+        # Store the message for inclusion in the final result
+        ctx = _request_context.get()
+        if ctx and hasattr(ctx, 'progress_messages'):
+            ctx.progress_messages.append(message)
+        
+        # Also try to send as log message (for debugging/console output)
+        if ctx and hasattr(ctx, 'session'):
+            try:
+                # Map string level to LoggingLevel enum
+                log_level = {
+                    "debug": LoggingLevel.DEBUG,
+                    "info": LoggingLevel.INFO,
+                    "warning": LoggingLevel.WARNING,
+                    "error": LoggingLevel.ERROR
+                }.get(level.lower(), LoggingLevel.INFO)
+                
+                await ctx.session.send_log_message(
+                    level=log_level,
+                    data=message
+                )
+            except Exception as e:
+                logger.debug(f"Could not send progress notification: {e}")
+        
+        # Also log to stderr
+        logger.debug(message)
+    
+    def _get_progress_summary(self) -> str:
+        """Get formatted progress summary from request context"""
+        ctx = _request_context.get()
+        if ctx and hasattr(ctx, 'progress_messages') and ctx.progress_messages:
+            return "\n\n--- Progress Log ---\n" + "\n".join(ctx.progress_messages) + "\n--- End Progress Log ---\n\n"
+        return ""
+
     
     async def _handle_standard_tool(self, tool: Dict[str, Any], arguments: dict) -> List[TextContent]:
         """Handle a standard single-endpoint tool"""
@@ -151,9 +204,13 @@ class GenericMCPServer:
         orchestration_logic = tool.get("orchestration_logic", "")
         use_case = tool.get("use_case_description", "")
         
-        print(f"[MCP] Executing composite tool: {tool['name']}")
-        print(f"[MCP] Use case: {use_case}")
-        print(f"[MCP] Orchestration: {orchestration_logic[:100]}...")
+        await self._send_progress(f"🚀 Starting composite tool: {tool['name']}")
+        await self._send_progress(f"📋 Use case: {use_case}")
+        await self._send_progress(f"🔧 Orchestration strategy: {orchestration_logic[:100]}...")
+        
+        logger.info(f"Executing composite tool: {tool['name']}")
+        logger.debug(f"Use case: {use_case}")
+        logger.debug(f"Orchestration: {orchestration_logic[:100]}...")
         
         # Build MCP tool definitions for the agent
         mcp_tools = []
@@ -191,7 +248,8 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
         client = Anthropic(api_key=self.anthropic_api_key)
         messages = []
         
-        print("[MCP] Starting MCP orchestration agent...")
+        await self._send_progress(f"🤖 Initializing AI orchestration agent...")
+        logger.info("Starting MCP orchestration agent")
         
         try:
             # Agentic loop with MCP tool calls
@@ -200,7 +258,8 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
             
             while iteration < max_iterations:
                 iteration += 1
-                print(f"[MCP] Agent iteration {iteration}/{max_iterations}")
+                await self._send_progress(f"🔄 Agent iteration {iteration}/{max_iterations}")
+                logger.debug(f"Agent iteration {iteration}/{max_iterations}")
                 
                 # Call Claude with MCP tools
                 response = client.messages.create(
@@ -222,8 +281,14 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
                         if hasattr(block, 'text'):
                             final_text += block.text
                     
-                    print(f"[MCP] Agent completed successfully in {iteration} iterations")
-                    return [TextContent(type="text", text=final_text)]
+                    await self._send_progress(f"✅ Orchestration completed successfully in {iteration} iterations")
+                    logger.info(f"Agent completed successfully in {iteration} iterations")
+                    
+                    # Include progress log in the result
+                    progress_summary = self._get_progress_summary()
+                    result_text = progress_summary + final_text if progress_summary else final_text
+                    
+                    return [TextContent(type="text", text=result_text)]
                 
                 # Process MCP tool calls
                 if response.stop_reason == "tool_use":
@@ -235,7 +300,9 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
                             tool_input = block.input
                             tool_use_id = block.id
                             
-                            print(f"[MCP]   → Calling MCP tool: {tool_name}({json.dumps(tool_input)})")
+                            # Send progress notification about the tool call
+                            await self._send_progress(f"  🔧 Calling: {tool_name}({json.dumps(tool_input, indent=2)})")
+                            logger.debug(f"Calling MCP tool: {tool_name} with args: {json.dumps(tool_input)}")
                             
                             # Find and execute the MCP tool (which calls the actual API)
                             tool_found = False
@@ -245,7 +312,10 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
                                     result = await self._handle_standard_tool(standard_tool, tool_input)
                                     tool_result_text = result[0].text if result else "No response"
                                     
-                                    print(f"[MCP]   ← MCP tool result: {tool_result_text[:100]}...")
+                                    # Send progress notification about the result
+                                    result_preview = tool_result_text[:150] + "..." if len(tool_result_text) > 150 else tool_result_text
+                                    await self._send_progress(f"  ✓ Result from {tool_name}: {result_preview}")
+                                    logger.debug(f"MCP tool result: {tool_result_text[:200]}...")
                                     
                                     tool_results.append({
                                         "type": "tool_result",
@@ -256,10 +326,12 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
                                     break
                             
                             if not tool_found:
+                                error_msg = f"Error: MCP tool {tool_name} not found"
+                                await self._send_progress(f"  ❌ {error_msg}", "error")
                                 tool_results.append({
                                     "type": "tool_result",
                                     "tool_use_id": tool_use_id,
-                                    "content": f"Error: MCP tool {tool_name} not found",
+                                    "content": error_msg,
                                     "is_error": True
                                 })
                     
@@ -267,20 +339,38 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
                     messages.append({"role": "user", "content": tool_results})
                 else:
                     # Unexpected stop reason
+                    error_msg = f"Orchestration stopped unexpectedly: {response.stop_reason}"
+                    await self._send_progress(f"⚠️ {error_msg}", "warning")
+                    
+                    progress_summary = self._get_progress_summary()
+                    result_text = progress_summary + error_msg if progress_summary else error_msg
+                    
                     return [TextContent(
                         type="text",
-                        text=f"Orchestration stopped unexpectedly: {response.stop_reason}"
+                        text=result_text
                     )]
             
             # Max iterations reached
+            error_msg = f"Orchestration failed: Maximum iterations ({max_iterations}) reached without completion"
+            await self._send_progress(f"❌ {error_msg}", "error")
+            
+            progress_summary = self._get_progress_summary()
+            result_text = progress_summary + error_msg if progress_summary else error_msg
+            
             return [TextContent(
                 type="text",
-                text=f"Orchestration failed: Maximum iterations ({max_iterations}) reached without completion"
+                text=result_text
             )]
         
         except Exception as e:
-            print(f"[MCP] Orchestration error: {str(e)}")
-            return [TextContent(type="text", text=f"Orchestration error: {str(e)}")]
+            error_msg = f"Orchestration error: {str(e)}"
+            await self._send_progress(f"❌ {error_msg}", "error")
+            logger.error(f"Orchestration error: {str(e)}", exc_info=True)
+            
+            progress_summary = self._get_progress_summary()
+            result_text = progress_summary + error_msg if progress_summary else error_msg
+            
+            return [TextContent(type="text", text=result_text)]
     
     async def run(self):
         """Run the MCP server"""
@@ -295,15 +385,23 @@ Execute the workflow step by step, calling MCP tools as needed. Each tool call w
 async def main():
     # Get tools config path from environment or use default
     tools_config_path = os.getenv("TOOLS_CONFIG_PATH", "tools.json")
-    
-    if not Path(tools_config_path).exists():
-        print(f"[MCP] Error: Tools configuration file not found: {tools_config_path}")
-        print("[MCP] Please set TOOLS_CONFIG_PATH environment variable or ensure tools.json exists in current directory")
+    script_dir = Path(__file__).parent
+
+    # Resolve path relative to current working directory
+    config_path = Path(tools_config_path)
+
+    if not config_path.is_absolute():
+        config_path = script_dir / config_path
+
+    if not config_path.exists():
+        logger.error("Please set TOOLS_CONFIG_PATH environment variable or ensure tools.json exists")
         return
-    print(f"[MCP] Booting Generic MCP Server...\n")
-    server = GenericMCPServer(tools_config_path)
-    print(f"[MCP] Server is now running. Waiting for MCP client connection...\n")
+
+    logger.info("Booting Generic MCP Server")
+    server = GenericMCPServer(str(config_path))
+    logger.info("Server is now running. Waiting for MCP client connection...")
     await server.run()
+
 
 
 if __name__ == "__main__":

@@ -96,61 +96,52 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
-{{
-  "mcpServers": {{
-    "{server_name}": {{
-      "command": "python",
-      "args": ["{server_path}/server.py"],
-      "env": {{
-        "API_KEY": "your-api-key-here",
-        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
-      }}
-    }}
-  }}
-}}
+{
+  "mcpServers": {
+    "products": {
+      "command": "~/.local/bin/uv",
+      "args": [
+        "run",
+				"~/projects/demos/openapi-to-mcp/generated-servers/products-mcp/server.py"
+      ],
+      "cwd": "~/projects/demos/openapi-to-mcp/generated-servers/products-mcp"
+    }
+  }
+}
 ```
+
+```json
+{
+  "mcpServers": {
+    "products": {
+      "command": "/Users/opdebto/Projects/demos/products-mcp/.venv/Scripts/python",
+      "args": [
+        "/Users/opdebto/Projects/demos/products-mcp/server.py"
+      ],
+      "cwd": "/Users/opdebto/Projects/demos/products-mcp"
+    }
+  }
+}
 
 ## Usage with VS Code (GitHub Copilot)
 
 Add to your VS Code MCP config (`.vscode/mcp.json` in your workspace):
 
 ```json
-{{
-  "servers": {{
-    "{server_name}": {{
-      "command": "uv",
-      "args": [
-        "run",
-        "{server_path}/server.py"
-      ],
-      "cwd": "{server_path}",
-      "env": {{
-        "API_KEY": "your-api-key-here",
-        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
-      }}
-    }}
-  }},
+{
+  "servers": {
+    "products": {
+			"type": "stdio",
+			"command": "~/.local/bin/uv",
+			"args": [
+				"run",
+				"~/projects/demos/openapi-to-mcp/generated-servers/products-mcp/server.py"
+			],
+			"cwd": "~/projects/demos/openapi-to-mcp/generated-servers/products-mcp"
+		}
+  },
   "inputs": []
-}}
-```
-
-**Note**: If using uv, make sure it's installed and in your PATH. You can also use `python` instead of `uv` for the command, adjusting the args accordingly:
-
-```json
-{{
-  "servers": {{
-    "{server_name}": {{
-      "command": "python",
-      "args": ["{server_path}/server.py"],
-      "cwd": "{server_path}",
-      "env": {{
-        "API_KEY": "your-api-key-here",
-        "TOOLS_CONFIG_PATH": "{server_path}/tools.json"
-      }}
-    }}
-  }},
-  "inputs": []
-}}
+}
 ```
 
 ## Usage with Other MCP Clients
