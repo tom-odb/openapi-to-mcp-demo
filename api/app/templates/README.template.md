@@ -24,6 +24,7 @@ This server reads tool definitions from `tools.json` and exposes them as MCP (Mo
 ### Using uv (recommended)
 
 1. Install dependencies:
+
 ```bash
 # Standard installation (for standard tools only)
 uv sync
@@ -33,29 +34,13 @@ uv sync --extra composite
 ```
 
 2. Configure environment variables:
+
 ```bash
 cp .env.example .env
-# Edit .env with your API credentials
-# If using composite tools, also add ANTHROPIC_API_KEY
 ```
 
-### Using pip (alternative)
-
-1. Install dependencies:
-```bash
-# Standard installation (for standard tools only)
-pip install -e .
-
-# With composite tools support (includes Anthropic)
-pip install -e ".[composite]"
-```
-
-2. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your API credentials
-# If using composite tools, also add ANTHROPIC_API_KEY
-```
+- Edit .env with your API credentials
+- If using composite tools, also add ANTHROPIC_API_KEY
 
 ## Configuration
 
@@ -73,25 +58,9 @@ The server reads tool definitions from `tools.json`. This file contains:
 
 You can modify `tools.json` to add, remove, or customize tools without changing the server code.
 
-## Running the Server
+## Usage
 
-### For Development/Testing
-
-Run with uvicorn directly:
-```bash
-uv run uvicorn server:app --host 0.0.0.0 --port 8000
-```
-
-Or activate the virtual environment first:
-```bash
-source .venv/bin/activate  # On Linux/macOS
-# or
-.venv\Scripts\activate  # On Windows
-
-uvicorn server:app --host 0.0.0.0 --port 8000
-```
-
-## Usage with Claude Desktop
+### With Claude Desktop
 
 Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
@@ -102,28 +71,15 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
       "command": "~/.local/bin/uv",
       "args": [
         "run",
-				"~/projects/demos/openapi-to-mcp/generated-servers/products-mcp/server.py"
+				"/path/to/mcp-server/server-name/server.py"
       ],
-      "cwd": "~/projects/demos/openapi-to-mcp/generated-servers/products-mcp"
+      "cwd": "/path/to/mcp-server/server-name"
     }
   }
 }
 ```
 
-```json
-{
-  "mcpServers": {
-    "products": {
-      "command": "/Users/opdebto/Projects/demos/products-mcp/.venv/Scripts/python",
-      "args": [
-        "/Users/opdebto/Projects/demos/products-mcp/server.py"
-      ],
-      "cwd": "/Users/opdebto/Projects/demos/products-mcp"
-    }
-  }
-}
-
-## Usage with VS Code (GitHub Copilot)
+### With VS Code (GitHub Copilot)
 
 Add to your VS Code MCP config (`.vscode/mcp.json` in your workspace):
 
@@ -135,24 +91,13 @@ Add to your VS Code MCP config (`.vscode/mcp.json` in your workspace):
 			"command": "~/.local/bin/uv",
 			"args": [
 				"run",
-				"~/projects/demos/openapi-to-mcp/generated-servers/products-mcp/server.py"
+				"/path/to/mcp-server/server-name/server.py"
 			],
-			"cwd": "~/projects/demos/openapi-to-mcp/generated-servers/products-mcp"
+			"cwd": "/path/to/mcp-server/server-name"
 		}
   },
   "inputs": []
 }
-```
-
-## Usage with Other MCP Clients
-
-```bash
-# Set environment variables
-export API_KEY=your-api-key-here
-export TOOLS_CONFIG_PATH=/path/to/tools.json
-
-# Run the server
-python server.py
 ```
 
 ## Architecture

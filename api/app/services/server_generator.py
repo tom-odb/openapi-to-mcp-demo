@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import Dict, Any
 from ..models.schemas import ToolModel
 import json
 import shutil
 
 class ServerGenerator:
     def __init__(self):
-        self.template_dir = Path(__file__).parent / "templates"
+        self.template_dir = Path(__file__).parent.parent / "templates"
 
     def generate_server(self, tool_model: ToolModel, server_name: str, output_dir: str) -> str:
         """Generate a complete MCP server from tool model using declarative JSON approach"""
@@ -14,9 +13,11 @@ class ServerGenerator:
         output_path = Path(output_dir) / server_name
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Copy generic server.py
-        generic_server = self.template_dir / "server.template.py"
-        shutil.copy2(generic_server, output_path / "server.py")
+        # Copy the entire MCP server template structure
+        mcp_server_template = self.template_dir / "mcp_server"
+        if mcp_server_template.exists():
+            # Copy the entire template directory structure
+            self._copy_template_structure(mcp_server_template, output_path)
 
         # Save tools.json
         tools_data = tool_model.model_dump()
@@ -36,6 +37,20 @@ class ServerGenerator:
         (output_path / ".env.example").write_text(env_example)
 
         return str(output_path)
+
+    def _copy_template_structure(self, template_dir: Path, output_dir: Path):
+        """Copy the entire template directory structure to the output directory"""
+        for item in template_dir.rglob("*"):
+            if item.is_file():
+                # Calculate relative path from template_dir
+                relative_path = item.relative_to(template_dir)
+                target_path = output_dir / relative_path
+                
+                # Create parent directories if they don't exist
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Copy the file
+                shutil.copy2(item, target_path)
 
     def _generate_readme(self, tool_model: ToolModel, server_name: str, server_path: str) -> str:
         """Generate README from template"""
